@@ -3,46 +3,318 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Somme de deux nombres</title>
+  <title>Joueur 1</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; }
-    label { display: block; margin: 12px 0 6px; }
-    input { width: 100%; padding: 10px; font-size: 16px; }
-    .result { margin-top: 16px; padding: 12px; background: #f4f4f5; border-radius: 8px; font-size: 18px; }
+    :root { --accent: #7CFF4D; }
+
+    body{
+      font-family: system-ui, Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #fff;
+    }
+
+    .wrap{
+      display: grid;
+      grid-template-columns: 180px 140px;
+      column-gap: 14px;
+      row-gap: 10px;
+      align-items: center;
+    }
+
+    .spacer{ height: 1px; }
+
+    h1{
+      font-size: 22px;
+      margin: 0 0 4px 0;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .label{
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      user-select: none;
+    }
+
+    select.score, input.readonly{
+      width: 110px;
+      height: 42px;
+      font-size: 18px;
+      text-align: center;
+
+      border-radius: 4px;
+      border: 2px solid var(--accent);
+      background: #fff;
+      outline: none;
+      appearance: auto;
+      justify-self: center;
+    }
+
+    select.score.filled{
+      border-color: #000;
+    }
+
+    input.readonly{
+      border-color: #000;
+    }
+
+    select.score:focus{
+      box-shadow: 0 0 0 3px rgba(124, 255, 77, 0.35);
+    }
+
+    input.readonly:disabled{
+      color: #111;
+      background: #f4f4f5;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
-  <h1>Somme de deux nombres</h1>
 
-  <label for="a">Nombre 1</label>
-  <input id="a" type="number" inputmode="decimal" placeholder="Ex: 12.5" />
-
-  <label for="b">Nombre 2</label>
-  <input id="b" type="number" inputmode="decimal" placeholder="Ex: 3" />
-
-  <div class="result">
-    Somme : <strong id="sum">0</strong>
+  <div id="grid" class="wrap">
+    <div class="spacer"></div>
+    <h1>Joueur 1</h1>
   </div>
 
   <script>
-    const a = document.getElementById("a");
-    const b = document.getElementById("b");
-    const sum = document.getElementById("sum");
+    const grid = document.getElementById("grid");
 
-    function update() {
-      const x = Number(a.value);
-      const y = Number(b.value);
+    const upperLabels = ["As", "Deux", "Troix", "Quatre", "Cinq", "Six"];
+    const MAX_K = 5;
 
-      // Si un champ est vide, Number("") vaut 0, donc ça marche bien.
-      const s = x + y;
+    const upperSelects = [];
+    const userSelects = [];
 
-      // Si jamais c'est NaN (ex: saisie invalide), on affiche 0
-      sum.textContent = Number.isFinite(s) ? s : 0;
+    let brelanSelect, carreSelect, fullSelect, petiteSuiteSelect, grandeSuiteSelect, yamsSelect;
+
+    let totalPointsInput, bonusInput, upperTotalInput;
+    let minSelect, maxSelect, deltaInput;
+    let lowerTotalInput, totalInput;
+
+    function makeLabel(text) {
+      const d = document.createElement("div");
+      d.className = "label";
+      d.textContent = text;
+      return d;
     }
 
-    a.addEventListener("input", update);
-    b.addEventListener("input", update);
-    update();
+    function range(min, max) {
+      const arr = [];
+      for (let i = min; i <= max; i++) arr.push(i);
+      return arr;
+    }
+
+    function makeSelect(values, defaultValue = 0) {
+      const sel = document.createElement("select");
+      sel.className = "score";
+      for (const v of values) {
+        const opt = document.createElement("option");
+        opt.value = String(v);
+        opt.textContent = String(v);
+        if (v === defaultValue) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      return sel;
+    }
+
+    function makeSelectWithEmpty(values, emptyLabel = "—") {
+      const sel = document.createElement("select");
+      sel.className = "score";
+
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = emptyLabel;
+      empty.selected = true;
+      sel.appendChild(empty);
+
+      for (const v of values) {
+        const opt = document.createElement("option");
+        opt.value = String(v);
+        opt.textContent = String(v);
+        sel.appendChild(opt);
+      }
+      return sel;
+    }
+
+    function makeReadonlyInput(initial = "0") {
+      const input = document.createElement("input");
+      input.className = "readonly";
+      input.type = "text";
+      input.value = initial;
+      input.disabled = true;
+      return input;
+    }
+
+    function isFilledSelect(sel) {
+      return sel.value !== "" && Number(sel.value) !== 0;
+    }
+
+    function updateBorders() {
+      for (const sel of userSelects) {
+        sel.classList.toggle("filled", isFilledSelect(sel));
+      }
+    }
+
+    function computeUpperTotalPoints() {
+      let total = 0;
+      for (const sel of upperSelects) total += Number(sel.value) || 0;
+      return total;
+    }
+
+    function computeBonus(totalPoints) {
+      let bonus = -63 + totalPoints;
+      if (bonus >= 0) bonus = 35;
+      return bonus;
+    }
+
+    function computeDelta() {
+      const asVal = Number(upperSelects[0]?.value) || 0;
+
+      if (minSelect.value === "" || maxSelect.value === "") return 0;
+
+      const minVal = Number(minSelect.value);
+      const maxVal = Number(maxSelect.value);
+
+      if (maxVal < minVal) return 0;
+
+      return (maxVal - minVal) * asVal;
+    }
+
+    function computeLowerTotal(delta) {
+      const brelan = Number(brelanSelect.value) || 0;
+      const carre = Number(carreSelect.value) || 0;
+      const full = Number(fullSelect.value) || 0;
+      const petite = Number(petiteSuiteSelect.value) || 0;
+      const grande = Number(grandeSuiteSelect.value) || 0;
+      const yams = Number(yamsSelect.value) || 0;
+
+      return brelan + carre + full + petite + grande + yams + delta;
+    }
+
+    function updateComputed() {
+      const totalPoints = computeUpperTotalPoints();
+      const bonus = computeBonus(totalPoints);
+
+      // Upper total ne doit pas être négatif
+      const upperTotalRaw = totalPoints + bonus;
+      const upperTotal = Math.max(0, upperTotalRaw);
+
+      totalPointsInput.value = String(totalPoints);
+      bonusInput.value = String(bonus);
+      upperTotalInput.value = String(upperTotal);
+
+      const delta = computeDelta();
+      deltaInput.value = String(delta);
+
+      const lowerTotal = computeLowerTotal(delta);
+      lowerTotalInput.value = String(lowerTotal);
+
+      const grandTotal = lowerTotal + upperTotal;
+      totalInput.value = String(grandTotal);
+
+      updateBorders();
+    }
+
+    // --- 6 lignes (As..Six)
+    for (let i = 0; i < upperLabels.length; i++) {
+      const n = i + 1;
+
+      const values = [];
+      for (let k = 0; k <= MAX_K; k++) values.push(n * k);
+
+      const sel = makeSelect(values, 0);
+      sel.addEventListener("change", updateComputed);
+
+      upperSelects.push(sel);
+      userSelects.push(sel);
+
+      grid.appendChild(makeLabel(upperLabels[i]));
+      grid.appendChild(sel);
+    }
+
+    // --- Champs calculés partie supérieure
+    totalPointsInput = makeReadonlyInput("0");
+    grid.appendChild(makeLabel("Total des points"));
+    grid.appendChild(totalPointsInput);
+
+    bonusInput = makeReadonlyInput("-63");
+    grid.appendChild(makeLabel("Bonus"));
+    grid.appendChild(bonusInput);
+
+    upperTotalInput = makeReadonlyInput("0");
+    grid.appendChild(makeLabel("Total partie supérieure"));
+    grid.appendChild(upperTotalInput);
+
+    // --- Partie inférieure : Brelan...Yams
+    brelanSelect = makeSelect(range(0, 30), 0);
+    brelanSelect.addEventListener("change", updateComputed);
+    userSelects.push(brelanSelect);
+    grid.appendChild(makeLabel("Brelan"));
+    grid.appendChild(brelanSelect);
+
+    carreSelect = makeSelect(range(0, 30), 0);
+    carreSelect.addEventListener("change", updateComputed);
+    userSelects.push(carreSelect);
+    grid.appendChild(makeLabel("Carré"));
+    grid.appendChild(carreSelect);
+
+    fullSelect = makeSelect([0, 25], 0);
+    fullSelect.addEventListener("change", updateComputed);
+    userSelects.push(fullSelect);
+    grid.appendChild(makeLabel("Full"));
+    grid.appendChild(fullSelect);
+
+    petiteSuiteSelect = makeSelect([0, 15], 0);
+    petiteSuiteSelect.addEventListener("change", updateComputed);
+    userSelects.push(petiteSuiteSelect);
+    grid.appendChild(makeLabel("Petite suite"));
+    grid.appendChild(petiteSuiteSelect);
+
+    grandeSuiteSelect = makeSelect([0, 30], 0);
+    grandeSuiteSelect.addEventListener("change", updateComputed);
+    userSelects.push(grandeSuiteSelect);
+    grid.appendChild(makeLabel("Grande suite"));
+    grid.appendChild(grandeSuiteSelect);
+
+    yamsSelect = makeSelect([0, 50], 0);
+    yamsSelect.addEventListener("change", updateComputed);
+    userSelects.push(yamsSelect);
+    grid.appendChild(makeLabel("Yams"));
+    grid.appendChild(yamsSelect);
+
+    // --- Min / Max (vides au départ)
+    minSelect = makeSelectWithEmpty(range(5, 30));
+    minSelect.addEventListener("change", updateComputed);
+    userSelects.push(minSelect);
+    grid.appendChild(makeLabel("Min"));
+    grid.appendChild(minSelect);
+
+    maxSelect = makeSelectWithEmpty(range(5, 30));
+    maxSelect.addEventListener("change", updateComputed);
+    userSelects.push(maxSelect);
+    grid.appendChild(makeLabel("Max"));
+    grid.appendChild(maxSelect);
+
+    // --- Delta (calculé)
+    deltaInput = makeReadonlyInput("0");
+    grid.appendChild(makeLabel("Delta"));
+    grid.appendChild(deltaInput);
+
+    // --- Totaux
+    lowerTotalInput = makeReadonlyInput("0");
+    grid.appendChild(makeLabel("Total partie inférieur"));
+    grid.appendChild(lowerTotalInput);
+
+    totalInput = makeReadonlyInput("0");
+    grid.appendChild(makeLabel("Total"));
+    grid.appendChild(totalInput);
+
+    updateComputed();
   </script>
+
 </body>
 </html>
