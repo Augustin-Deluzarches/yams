@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Somme de deux nombres</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; }
+    label { display: block; margin: 12px 0 6px; }
+    input { width: 100%; padding: 10px; font-size: 16px; }
+    .result { margin-top: 16px; padding: 12px; background: #f4f4f5; border-radius: 8px; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Somme de deux nombres</h1>
+
+  <label for="a">Nombre 1</label>
+  <input id="a" type="number" inputmode="decimal" placeholder="Ex: 12.5" />
+
+  <label for="b">Nombre 2</label>
+  <input id="b" type="number" inputmode="decimal" placeholder="Ex: 3" />
+
+  <div class="result">
+    Somme : <strong id="sum">0</strong>
+  </div>
+
+  <script>
+    const a = document.getElementById("a");
+    const b = document.getElementById("b");
+    const sum = document.getElementById("sum");
+
+    function update() {
+      const x = Number(a.value);
+      const y = Number(b.value);
+
+      // Si un champ est vide, Number("") vaut 0, donc ça marche bien.
+      const s = x + y;
+
+      // Si jamais c'est NaN (ex: saisie invalide), on affiche 0
+      sum.textContent = Number.isFinite(s) ? s : 0;
+    }
+
+    a.addEventListener("input", update);
+    b.addEventListener("input", update);
+    update();
+  </script>
+</body>
+</html>
