@@ -97,6 +97,8 @@
       white-space: nowrap;
     }
 
+
+
     /* Cases */
     select.score, input.readonly{
       width: 110px;
@@ -161,6 +163,13 @@
 
     #ranking .name{ font-weight: 700; }
     #ranking .score{ font-variant-numeric: tabular-nums; }
+
+    #splashImage{
+      max-width: min(520px, 80vw);
+      max-height: 60vh;
+      object-fit: contain;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -176,6 +185,8 @@
   </div>
 
   <div class="page">
+    <img id="splashImage" src="gildas.png" alt="Gildas" />
+
     <!-- caché tant qu'il n'y a aucun joueur -->
     <div id="board" class="board hidden" aria-live="polite"></div>
     <div id="ranking" class="hidden" aria-live="polite"></div>
@@ -223,6 +234,7 @@
     const rankingEl = document.getElementById("ranking");
     const addPlayerBtn = document.getElementById("addPlayerBtn");
     const rulesMenu = document.getElementById("rulesMenu");
+    const splashImage = document.getElementById("splashImage");
 
     let rulesMode = "delta"; // "delta" | "chance"
     const players = [];      // { name, els: {...} }
@@ -463,6 +475,9 @@
     // ---------------------------
     function rebuildBoard(){
       const hasPlayers = players.length > 0;
+
+      splashImage.classList.toggle("hidden", hasPlayers);
+
       board.classList.toggle("hidden", !hasPlayers);
       rulesMenu.classList.toggle("hidden", !hasPlayers);
 
