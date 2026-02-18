@@ -3,34 +3,82 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Joueur 1</title>
+  <title>Score Yams</title>
   <style>
-    :root { --accent: #7CFF4D; }
+    :root{
+      --accent: #7CFF4D;
+      --border-green: var(--accent);
+      --border-black: #000;
+      --bg: #fff;
+      --calc-bg: #f4f4f5;
+    }
 
     body{
       font-family: system-ui, Arial, sans-serif;
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #fff;
+      background: var(--bg);
     }
 
-    .wrap{
-      display: grid;
-      grid-template-columns: 180px 140px;
-      column-gap: 14px;
-      row-gap: 10px;
+    /* Top bar */
+    .top-left{
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 20;
+      display: flex;
+      gap: 10px;
       align-items: center;
     }
 
-    .spacer{ height: 1px; }
+    button.btn{
+      height: 40px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 2px solid #000;
+      background: #fff;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
 
-    h1{
-      font-size: 22px;
-      margin: 0 0 4px 0;
-      font-weight: 700;
-      text-align: center;
+    select.menu{
+      height: 40px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 2px solid #000;
+      background: #fff;
+      padding: 6px 10px;
+    }
+
+    /* Layout principal centré */
+    .page{
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 70px 16px 24px; /* laisse la place à la topbar */
+      box-sizing: border-box;
+    }
+
+    .hidden{ display: none !important; }
+
+    /* Tableau multi-joueurs */
+    .board{
+      display: grid;
+      row-gap: 10px;
+      column-gap: 14px;
+      align-items: center;
+    }
+
+    .header-btn{
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .header-btn:focus{
+      outline: 2px solid #000;
+      outline-offset: 2px;
     }
 
     .label{
@@ -38,8 +86,18 @@
       font-weight: 700;
       text-align: center;
       user-select: none;
+      white-space: nowrap;
     }
 
+    .header{
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    /* Cases */
     select.score, input.readonly{
       width: 110px;
       height: 42px;
@@ -47,71 +105,176 @@
       text-align: center;
 
       border-radius: 4px;
-      border: 2px solid var(--accent);
+      border: 2px solid var(--border-green);
       background: #fff;
       outline: none;
       appearance: auto;
       justify-self: center;
+      box-sizing: border-box;
     }
 
-    select.score.filled{
-      border-color: #000;
-    }
+    select.score.filled{ border-color: var(--border-black); }
 
     input.readonly{
-      border-color: #000;
+      border-color: var(--border-black);
+    }
+
+    input.readonly:disabled{
+      color: #111;
+      background: var(--calc-bg);
+      opacity: 1;
     }
 
     select.score:focus{
       box-shadow: 0 0 0 3px rgba(124, 255, 77, 0.35);
     }
 
-    input.readonly:disabled{
-      color: #111;
-      background: #f4f4f5;
-      opacity: 1;
+    /* Classement final */
+    #ranking{
+      margin-top: 18px;
+      border: 2px solid #000;
+      border-radius: 10px;
+      padding: 12px 14px;
+      max-width: 520px;
+      width: 100%;
+      background: #fff;
+      box-sizing: border-box;
     }
+
+    #ranking h2{
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    #ranking .row{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      border-top: 1px solid #ddd;
+      font-size: 16px;
+    }
+
+    #ranking .row:first-of-type{
+      border-top: none;
+    }
+
+    #ranking .name{ font-weight: 700; }
+    #ranking .score{ font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
 
-  <div id="grid" class="wrap">
-    <div class="spacer"></div>
-    <h1>Joueur 1</h1>
+  <div class="top-left">
+    <button id="addPlayerBtn" class="btn">Ajouter joueur</button>
+
+    <!-- caché tant qu'il n'y a aucun joueur -->
+    <select id="rulesMenu" class="menu hidden" aria-label="Règles">
+      <option value="delta" selected>Delta</option>
+      <option value="chance">Chance</option>
+    </select>
+  </div>
+
+  <div class="page">
+    <!-- caché tant qu'il n'y a aucun joueur -->
+    <div id="board" class="board hidden" aria-live="polite"></div>
+    <div id="ranking" class="hidden" aria-live="polite"></div>
   </div>
 
   <script>
-    const grid = document.getElementById("grid");
+    // ---------------------------
+    // Config des lignes (labels)
+    // ---------------------------
+    const ROWS = [
+      { key: "as", label: "As", type: "upper" },
+      { key: "deux", label: "Deux", type: "upper" },
+      { key: "troix", label: "Troix", type: "upper" },
+      { key: "quatre", label: "Quatre", type: "upper" },
+      { key: "cinq", label: "Cinq", type: "upper" },
+      { key: "six", label: "Six", type: "upper" },
 
-    const upperLabels = ["As", "Deux", "Troix", "Quatre", "Cinq", "Six"];
-    const MAX_K = 5;
+      { key: "total_points", label: "Total des points", type: "calc" },
+      { key: "bonus", label: "Bonus", type: "calc" },
+      { key: "upper_total", label: "Total partie supérieure", type: "calc" },
 
-    const upperSelects = [];
-    const userSelects = [];
+      { key: "brelan", label: "Brelan", type: "lower" },
+      { key: "carre", label: "Carré", type: "lower" },
+      { key: "full", label: "Full", type: "lower" },
+      { key: "petite_suite", label: "Petite suite", type: "lower" },
+      { key: "grande_suite", label: "Grande suite", type: "lower" },
+      { key: "yams", label: "Yams", type: "lower" },
 
-    let brelanSelect, carreSelect, fullSelect, petiteSuiteSelect, grandeSuiteSelect, yamsSelect;
+      // Bloc Delta (visible si rulesMode === "delta")
+      { key: "min", label: "Min", type: "delta" },
+      { key: "max", label: "Max", type: "delta" },
+      { key: "delta", label: "Delta", type: "calc_delta" },
 
-    let totalPointsInput, bonusInput, upperTotalInput;
-    let minSelect, maxSelect, deltaInput;
-    let lowerTotalInput, totalInput;
+      // Bloc Chance (visible si rulesMode === "chance")
+      { key: "chance", label: "Chance", type: "chance" },
 
-    function makeLabel(text) {
+      { key: "lower_total", label: "Total partie inférieur", type: "calc" },
+      { key: "total", label: "Total", type: "calc" },
+    ];
+
+    // ---------------------------
+    // Helpers
+    // ---------------------------
+    const board = document.getElementById("board");
+    const rankingEl = document.getElementById("ranking");
+    const addPlayerBtn = document.getElementById("addPlayerBtn");
+    const rulesMenu = document.getElementById("rulesMenu");
+
+    let rulesMode = "delta"; // "delta" | "chance"
+    const players = [];      // { name, els: {...} }
+
+    function range(min, max){
+      const a = [];
+      for(let i=min;i<=max;i++) a.push(i);
+      return a;
+    }
+
+    function makeLabelCell(text){
       const d = document.createElement("div");
       d.className = "label";
       d.textContent = text;
       return d;
     }
 
-    function range(min, max) {
-      const arr = [];
-      for (let i = min; i <= max; i++) arr.push(i);
-      return arr;
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#39;");
     }
 
-    function makeSelect(values, defaultValue = 0) {
+    function makeHeaderCell(player){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header header-btn";
+      btn.textContent = player.name;
+      btn.title = "Cliquer pour supprimer ce joueur";
+
+      btn.addEventListener("click", () => {
+        const ok = confirm(`Supprimer le joueur "${player.name}" ?`);
+        if (!ok) return;
+
+        const idx = players.indexOf(player);
+        if (idx >= 0) players.splice(idx, 1);
+
+        rebuildBoard();
+        updateAllPlayers();
+        updateRankingVisibility();
+      });
+
+      return btn;
+    }
+
+    function makeSelect(values, defaultValue = 0){
       const sel = document.createElement("select");
       sel.className = "score";
-      for (const v of values) {
+      for (const v of values){
         const opt = document.createElement("option");
         opt.value = String(v);
         opt.textContent = String(v);
@@ -121,17 +284,16 @@
       return sel;
     }
 
-    function makeSelectWithEmpty(values, emptyLabel = "—") {
+    function makeSelectWithEmpty(values, emptyLabel = "—"){
       const sel = document.createElement("select");
       sel.className = "score";
-
       const empty = document.createElement("option");
       empty.value = "";
       empty.textContent = emptyLabel;
       empty.selected = true;
       sel.appendChild(empty);
 
-      for (const v of values) {
+      for (const v of values){
         const opt = document.createElement("option");
         opt.value = String(v);
         opt.textContent = String(v);
@@ -140,7 +302,7 @@
       return sel;
     }
 
-    function makeReadonlyInput(initial = "0") {
+    function makeReadonlyInput(initial="0"){
       const input = document.createElement("input");
       input.className = "readonly";
       input.type = "text";
@@ -149,171 +311,266 @@
       return input;
     }
 
-    function isFilledSelect(sel) {
-      return sel.value !== "" && Number(sel.value) !== 0;
+    // "rempli" dès que ce n'est pas vide
+    function isFilledSelect(sel){
+      return sel.value !== "";
     }
 
-    function updateBorders() {
-      for (const sel of userSelects) {
+    function updateFilledClassForPlayer(p){
+      const selects = [
+        p.els.as, p.els.deux, p.els.troix, p.els.quatre, p.els.cinq, p.els.six,
+        p.els.brelan, p.els.carre, p.els.full, p.els.petite_suite, p.els.grande_suite, p.els.yams,
+        p.els.min, p.els.max, p.els.chance
+      ].filter(Boolean);
+
+      for (const sel of selects){
         sel.classList.toggle("filled", isFilledSelect(sel));
       }
     }
 
-    function computeUpperTotalPoints() {
-      let total = 0;
-      for (const sel of upperSelects) total += Number(sel.value) || 0;
-      return total;
+    // ---------------------------
+    // Classement final
+    // ---------------------------
+    function allFieldsCompleted(){
+      if (players.length === 0) return false;
+
+      for (const p of players){
+        const selects = [
+          p.els.as, p.els.deux, p.els.troix, p.els.quatre, p.els.cinq, p.els.six,
+          p.els.brelan, p.els.carre, p.els.full, p.els.petite_suite, p.els.grande_suite, p.els.yams
+        ];
+
+        if (rulesMode === "delta"){
+          selects.push(p.els.min, p.els.max);
+        } else {
+          selects.push(p.els.chance);
+        }
+
+        for (const sel of selects){
+          if (!sel) continue;
+          if (sel.value === "") return false;
+        }
+      }
+      return true;
     }
 
-    function computeBonus(totalPoints) {
+    function renderRanking(){
+      const items = players.map(p => ({
+        name: p.name,
+        total: Number(p.els.total.value) || 0
+      }));
+
+      items.sort((a,b) => b.total - a.total);
+
+      rankingEl.innerHTML = `
+        <h2>Classement final</h2>
+        ${items.map((it, idx) => `
+          <div class="row">
+            <div class="name">${idx+1}. ${escapeHtml(it.name)}</div>
+            <div class="score">${it.total}</div>
+          </div>
+        `).join("")}
+      `;
+    }
+
+    function updateRankingVisibility(){
+      const done = allFieldsCompleted();
+      rankingEl.classList.toggle("hidden", !done);
+      if (done) renderRanking();
+    }
+
+    // ---------------------------
+    // Calculs (par joueur)
+    // ---------------------------
+    function computeBonus(totalPoints){
       let bonus = -63 + totalPoints;
       if (bonus >= 0) bonus = 35;
       return bonus;
     }
 
-    function computeDelta() {
-      const asVal = Number(upperSelects[0]?.value) || 0;
+    function computeUpperTotal(totalPoints, bonus){
+      // bonus ajouté seulement si bonus >= 0
+      const upperTotalRaw = (bonus >= 0) ? (totalPoints + bonus) : totalPoints;
+      return Math.max(0, upperTotalRaw);
+    }
 
-      if (minSelect.value === "" || maxSelect.value === "") return 0;
+    function computeDeltaForPlayer(p){
+      const asVal = Number(p.els.as.value) || 0;
 
-      const minVal = Number(minSelect.value);
-      const maxVal = Number(maxSelect.value);
+      if (p.els.min.value === "" || p.els.max.value === "") return 0;
+
+      const minVal = Number(p.els.min.value);
+      const maxVal = Number(p.els.max.value);
 
       if (maxVal < minVal) return 0;
 
       return (maxVal - minVal) * asVal;
     }
 
-    function computeLowerTotal(delta) {
-      const brelan = Number(brelanSelect.value) || 0;
-      const carre = Number(carreSelect.value) || 0;
-      const full = Number(fullSelect.value) || 0;
-      const petite = Number(petiteSuiteSelect.value) || 0;
-      const grande = Number(grandeSuiteSelect.value) || 0;
-      const yams = Number(yamsSelect.value) || 0;
-
-      return brelan + carre + full + petite + grande + yams + delta;
+    function computeLowerBaseForPlayer(p){
+      const brelan = Number(p.els.brelan.value) || 0;
+      const carre = Number(p.els.carre.value) || 0;
+      const full = Number(p.els.full.value) || 0;
+      const petite = Number(p.els.petite_suite.value) || 0;
+      const grande = Number(p.els.grande_suite.value) || 0;
+      const yams = Number(p.els.yams.value) || 0;
+      return brelan + carre + full + petite + grande + yams;
     }
 
-    function updateComputed() {
-      const totalPoints = computeUpperTotalPoints();
+    function updateComputedForPlayer(p){
+      const totalPoints =
+        (Number(p.els.as.value) || 0) +
+        (Number(p.els.deux.value) || 0) +
+        (Number(p.els.troix.value) || 0) +
+        (Number(p.els.quatre.value) || 0) +
+        (Number(p.els.cinq.value) || 0) +
+        (Number(p.els.six.value) || 0);
+
       const bonus = computeBonus(totalPoints);
+      const upperTotal = computeUpperTotal(totalPoints, bonus);
 
-      // Upper total ne doit pas être négatif
-      const upperTotalRaw = totalPoints + bonus;
-      const upperTotal = Math.max(0, upperTotalRaw);
+      p.els.total_points.value = String(totalPoints);
+      p.els.bonus.value = String(bonus);
+      p.els.upper_total.value = String(upperTotal);
 
-      totalPointsInput.value = String(totalPoints);
-      bonusInput.value = String(bonus);
-      upperTotalInput.value = String(upperTotal);
+      const lowerBase = computeLowerBaseForPlayer(p);
 
-      const delta = computeDelta();
-      deltaInput.value = String(delta);
+      let extra = 0;
+      if (rulesMode === "delta"){
+        const delta = computeDeltaForPlayer(p);
+        p.els.delta.value = String(delta);
+        extra = delta;
+      } else {
+        extra = Number(p.els.chance.value) || 0;
+      }
 
-      const lowerTotal = computeLowerTotal(delta);
-      lowerTotalInput.value = String(lowerTotal);
+      const lowerTotal = lowerBase + extra;
+      p.els.lower_total.value = String(lowerTotal);
 
-      const grandTotal = lowerTotal + upperTotal;
-      totalInput.value = String(grandTotal);
+      const total = lowerTotal + upperTotal;
+      p.els.total.value = String(total);
 
-      updateBorders();
+      updateFilledClassForPlayer(p);
+      updateRankingVisibility();
     }
 
-    // --- 6 lignes (As..Six)
-    for (let i = 0; i < upperLabels.length; i++) {
-      const n = i + 1;
-
-      const values = [];
-      for (let k = 0; k <= MAX_K; k++) values.push(n * k);
-
-      const sel = makeSelect(values, 0);
-      sel.addEventListener("change", updateComputed);
-
-      upperSelects.push(sel);
-      userSelects.push(sel);
-
-      grid.appendChild(makeLabel(upperLabels[i]));
-      grid.appendChild(sel);
+    function updateAllPlayers(){
+      for (const p of players) updateComputedForPlayer(p);
     }
 
-    // --- Champs calculés partie supérieure
-    totalPointsInput = makeReadonlyInput("0");
-    grid.appendChild(makeLabel("Total des points"));
-    grid.appendChild(totalPointsInput);
+    // ---------------------------
+    // Render board (rebuild)
+    // ---------------------------
+    function rebuildBoard(){
+      const hasPlayers = players.length > 0;
+      board.classList.toggle("hidden", !hasPlayers);
+      rulesMenu.classList.toggle("hidden", !hasPlayers);
 
-    bonusInput = makeReadonlyInput("-63");
-    grid.appendChild(makeLabel("Bonus"));
-    grid.appendChild(bonusInput);
+      board.innerHTML = "";
 
-    upperTotalInput = makeReadonlyInput("0");
-    grid.appendChild(makeLabel("Total partie supérieure"));
-    grid.appendChild(upperTotalInput);
+      if (!hasPlayers) return;
 
-    // --- Partie inférieure : Brelan...Yams
-    brelanSelect = makeSelect(range(0, 30), 0);
-    brelanSelect.addEventListener("change", updateComputed);
-    userSelects.push(brelanSelect);
-    grid.appendChild(makeLabel("Brelan"));
-    grid.appendChild(brelanSelect);
+      const labelColWidth = 180;
+      const playerColWidth = 140;
+      board.style.gridTemplateColumns = `${labelColWidth}px repeat(${players.length}, ${playerColWidth}px)`;
 
-    carreSelect = makeSelect(range(0, 30), 0);
-    carreSelect.addEventListener("change", updateComputed);
-    userSelects.push(carreSelect);
-    grid.appendChild(makeLabel("Carré"));
-    grid.appendChild(carreSelect);
+      // header
+      board.appendChild(document.createElement("div"));
+      for (const p of players){
+        board.appendChild(makeHeaderCell(p));
+      }
 
-    fullSelect = makeSelect([0, 25], 0);
-    fullSelect.addEventListener("change", updateComputed);
-    userSelects.push(fullSelect);
-    grid.appendChild(makeLabel("Full"));
-    grid.appendChild(fullSelect);
+      // rows
+      for (const row of ROWS){
+        const hiddenByMode =
+          (row.type === "delta" || row.type === "calc_delta") ? (rulesMode !== "delta") :
+          (row.type === "chance") ? (rulesMode !== "chance") :
+          false;
 
-    petiteSuiteSelect = makeSelect([0, 15], 0);
-    petiteSuiteSelect.addEventListener("change", updateComputed);
-    userSelects.push(petiteSuiteSelect);
-    grid.appendChild(makeLabel("Petite suite"));
-    grid.appendChild(petiteSuiteSelect);
+        if (hiddenByMode) continue;
 
-    grandeSuiteSelect = makeSelect([0, 30], 0);
-    grandeSuiteSelect.addEventListener("change", updateComputed);
-    userSelects.push(grandeSuiteSelect);
-    grid.appendChild(makeLabel("Grande suite"));
-    grid.appendChild(grandeSuiteSelect);
+        board.appendChild(makeLabelCell(row.label));
+        for (const p of players){
+          board.appendChild(p.els[row.key]);
+        }
+      }
+    }
 
-    yamsSelect = makeSelect([0, 50], 0);
-    yamsSelect.addEventListener("change", updateComputed);
-    userSelects.push(yamsSelect);
-    grid.appendChild(makeLabel("Yams"));
-    grid.appendChild(yamsSelect);
+    // ---------------------------
+    // Create player column
+    // ---------------------------
+    function createPlayer(name){
+      const p = { name, els: {} };
 
-    // --- Min / Max (vides au départ)
-    minSelect = makeSelectWithEmpty(range(5, 30));
-    minSelect.addEventListener("change", updateComputed);
-    userSelects.push(minSelect);
-    grid.appendChild(makeLabel("Min"));
-    grid.appendChild(minSelect);
+      // Upper selects: 0..5*n (avec option vide au départ)
+      const makeUpperSelect = (n) => {
+        const values = [];
+        for (let k=0;k<=5;k++) values.push(n*k);
+        const sel = makeSelectWithEmpty(values); // "—" par défaut
+        sel.addEventListener("change", () => updateComputedForPlayer(p));
+        return sel;
+      };
 
-    maxSelect = makeSelectWithEmpty(range(5, 30));
-    maxSelect.addEventListener("change", updateComputed);
-    userSelects.push(maxSelect);
-    grid.appendChild(makeLabel("Max"));
-    grid.appendChild(maxSelect);
+      p.els.as = makeUpperSelect(1);
+      p.els.deux = makeUpperSelect(2);
+      p.els.troix = makeUpperSelect(3);
+      p.els.quatre = makeUpperSelect(4);
+      p.els.cinq = makeUpperSelect(5);
+      p.els.six = makeUpperSelect(6);
 
-    // --- Delta (calculé)
-    deltaInput = makeReadonlyInput("0");
-    grid.appendChild(makeLabel("Delta"));
-    grid.appendChild(deltaInput);
+      // Calculés upper
+      p.els.total_points = makeReadonlyInput("0");
+      p.els.bonus = makeReadonlyInput("-63");
+      p.els.upper_total = makeReadonlyInput("0");
 
-    // --- Totaux
-    lowerTotalInput = makeReadonlyInput("0");
-    grid.appendChild(makeLabel("Total partie inférieur"));
-    grid.appendChild(lowerTotalInput);
+      // Lower selects (option vide au départ)
+      p.els.brelan = makeSelectWithEmpty(range(0,30)); p.els.brelan.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.carre = makeSelectWithEmpty(range(0,30)); p.els.carre.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.full = makeSelectWithEmpty([0,25]); p.els.full.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.petite_suite = makeSelectWithEmpty([0,15]); p.els.petite_suite.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.grande_suite = makeSelectWithEmpty([0,30]); p.els.grande_suite.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.yams = makeSelectWithEmpty([0,50]); p.els.yams.addEventListener("change", () => updateComputedForPlayer(p));
 
-    totalInput = makeReadonlyInput("0");
-    grid.appendChild(makeLabel("Total"));
-    grid.appendChild(totalInput);
+      // Delta mode fields
+      p.els.min = makeSelectWithEmpty(range(5,30)); p.els.min.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.max = makeSelectWithEmpty(range(5,30)); p.els.max.addEventListener("change", () => updateComputedForPlayer(p));
+      p.els.delta = makeReadonlyInput("0");
 
-    updateComputed();
+      // Chance mode field
+      p.els.chance = makeSelectWithEmpty(range(0,30)); p.els.chance.addEventListener("change", () => updateComputedForPlayer(p));
+
+      // Totaux
+      p.els.lower_total = makeReadonlyInput("0");
+      p.els.total = makeReadonlyInput("0");
+
+      updateFilledClassForPlayer(p);
+      return p;
+    }
+
+    // ---------------------------
+    // Events
+    // ---------------------------
+    addPlayerBtn.addEventListener("click", () => {
+      const name = prompt("Nom du joueur :");
+      if (!name) return;
+
+      const trimmed = name.trim();
+      if (!trimmed) return;
+
+      players.push(createPlayer(trimmed));
+      rebuildBoard();
+      updateAllPlayers();
+      updateRankingVisibility();
+    });
+
+    rulesMenu.addEventListener("change", (e) => {
+      rulesMode = e.target.value;
+      rebuildBoard();
+      updateAllPlayers();
+      updateRankingVisibility();
+    });
+
+    // Initial state: only "Ajouter joueur" visible (rules + board hidden)
   </script>
 
 </body>
