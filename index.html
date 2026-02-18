@@ -61,24 +61,12 @@
 
     .hidden{ display: none !important; }
 
-    /* Wrapper scroll horizontal */
-    .board-wrap{
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 6px;
-    }
-
     /* Tableau multi-joueurs */
     .board{
       display: grid;
       row-gap: 10px;
       column-gap: 14px;
       align-items: center;
-
-      width: max-content;
-      margin: 0 auto;
-      transform-origin: top center;
     }
 
     .header-btn{
@@ -180,6 +168,7 @@
   <div class="top-left">
     <button id="addPlayerBtn" class="btn">Ajouter joueur</button>
 
+    <!-- caché tant qu'il n'y a aucun joueur -->
     <select id="rulesMenu" class="menu hidden" aria-label="Règles">
       <option value="delta" selected>Delta</option>
       <option value="chance">Chance</option>
@@ -187,13 +176,15 @@
   </div>
 
   <div class="page">
-    <div id="boardWrap" class="board-wrap hidden">
-      <div id="board" class="board" aria-live="polite"></div>
-    </div>
+    <!-- caché tant qu'il n'y a aucun joueur -->
+    <div id="board" class="board hidden" aria-live="polite"></div>
     <div id="ranking" class="hidden" aria-live="polite"></div>
   </div>
 
   <script>
+    // ---------------------------
+    // Config des lignes (labels)
+    // ---------------------------
     const ROWS = [
       { key: "as", label: "As", type: "upper" },
       { key: "deux", label: "Deux", type: "upper" },
@@ -213,24 +204,28 @@
       { key: "grande_suite", label: "Grande suite", type: "lower" },
       { key: "yams", label: "Yams", type: "lower" },
 
+      // Bloc Delta (visible si rulesMode === "delta")
       { key: "min", label: "Min", type: "delta" },
       { key: "max", label: "Max", type: "delta" },
       { key: "delta", label: "Delta", type: "calc_delta" },
 
+      // Bloc Chance (visible si rulesMode === "chance")
       { key: "chance", label: "Chance", type: "chance" },
 
       { key: "lower_total", label: "Total partie inférieur", type: "calc" },
       { key: "total", label: "Total", type: "calc" },
     ];
 
+    // ---------------------------
+    // Helpers
+    // ---------------------------
     const board = document.getElementById("board");
-    const boardWrap = document.getElementById("boardWrap");
     const rankingEl = document.getElementById("ranking");
     const addPlayerBtn = document.getElementById("addPlayerBtn");
     const rulesMenu = document.getElementById("rulesMenu");
 
-    let rulesMode = "delta";
-    const players = [];
+    let rulesMode = "delta"; // "delta" | "chance"
+    const players = [];      // { name, els: {...} }
 
     function range(min, max){
       const a = [];
@@ -316,6 +311,7 @@
       return input;
     }
 
+    // "rempli" dès que ce n'est pas vide
     function isFilledSelect(sel){
       return sel.value !== "";
     }
@@ -332,6 +328,9 @@
       }
     }
 
+    // ---------------------------
+    // Classement final
+    // ---------------------------
     function allFieldsCompleted(){
       if (players.length === 0) return false;
 
@@ -380,6 +379,9 @@
       if (done) renderRanking();
     }
 
+    // ---------------------------
+    // Calculs (par joueur)
+    // ---------------------------
     function computeBonus(totalPoints){
       let bonus = -63 + totalPoints;
       if (bonus >= 0) bonus = 35;
@@ -387,6 +389,7 @@
     }
 
     function computeUpperTotal(totalPoints, bonus){
+      // bonus ajouté seulement si bonus >= 0
       const upperTotalRaw = (bonus >= 0) ? (totalPoints + bonus) : totalPoints;
       return Math.max(0, upperTotalRaw);
     }
@@ -455,9 +458,12 @@
       for (const p of players) updateComputedForPlayer(p);
     }
 
+    // ---------------------------
+    // Render board (rebuild)
+    // ---------------------------
     function rebuildBoard(){
       const hasPlayers = players.length > 0;
-      boardWrap.classList.toggle("hidden", !hasPlayers);
+      board.classList.toggle("hidden", !hasPlayers);
       rulesMenu.classList.toggle("hidden", !hasPlayers);
 
       board.innerHTML = "";
@@ -468,11 +474,13 @@
       const playerColWidth = 140;
       board.style.gridTemplateColumns = `${labelColWidth}px repeat(${players.length}, ${playerColWidth}px)`;
 
+      // header
       board.appendChild(document.createElement("div"));
       for (const p of players){
         board.appendChild(makeHeaderCell(p));
       }
 
+      // rows
       for (const row of ROWS){
         const hiddenByMode =
           (row.type === "delta" || row.type === "calc_delta") ? (rulesMode !== "delta") :
@@ -486,32 +494,19 @@
           board.appendChild(p.els[row.key]);
         }
       }
-
-      // --- Auto-fit sur mobile jusqu'à 3 joueurs
-      const maxVisiblePlayers = 3;
-      const padding = 24;
-      const available = Math.max(320, window.innerWidth - padding);
-
-      // approx: largeur colonnes + gaps
-      const approxGaps = 14 * (players.length); // gap entre colonnes joueurs (approx)
-      const boardWidth = labelColWidth + (players.length * playerColWidth) + approxGaps;
-
-      let scale = 1;
-      if (players.length <= maxVisiblePlayers) {
-        scale = Math.min(1, available / boardWidth);
-      } else {
-        scale = 1;
-      }
-      board.style.transform = `scale(${scale})`;
     }
 
+    // ---------------------------
+    // Create player column
+    // ---------------------------
     function createPlayer(name){
       const p = { name, els: {} };
 
+      // Upper selects: 0..5*n (avec option vide au départ)
       const makeUpperSelect = (n) => {
         const values = [];
         for (let k=0;k<=5;k++) values.push(n*k);
-        const sel = makeSelectWithEmpty(values);
+        const sel = makeSelectWithEmpty(values); // "—" par défaut
         sel.addEventListener("change", () => updateComputedForPlayer(p));
         return sel;
       };
@@ -523,10 +518,12 @@
       p.els.cinq = makeUpperSelect(5);
       p.els.six = makeUpperSelect(6);
 
+      // Calculés upper
       p.els.total_points = makeReadonlyInput("0");
       p.els.bonus = makeReadonlyInput("-63");
       p.els.upper_total = makeReadonlyInput("0");
 
+      // Lower selects (option vide au départ)
       p.els.brelan = makeSelectWithEmpty(range(0,30)); p.els.brelan.addEventListener("change", () => updateComputedForPlayer(p));
       p.els.carre = makeSelectWithEmpty(range(0,30)); p.els.carre.addEventListener("change", () => updateComputedForPlayer(p));
       p.els.full = makeSelectWithEmpty([0,25]); p.els.full.addEventListener("change", () => updateComputedForPlayer(p));
@@ -534,12 +531,15 @@
       p.els.grande_suite = makeSelectWithEmpty([0,30]); p.els.grande_suite.addEventListener("change", () => updateComputedForPlayer(p));
       p.els.yams = makeSelectWithEmpty([0,50]); p.els.yams.addEventListener("change", () => updateComputedForPlayer(p));
 
+      // Delta mode fields
       p.els.min = makeSelectWithEmpty(range(5,30)); p.els.min.addEventListener("change", () => updateComputedForPlayer(p));
       p.els.max = makeSelectWithEmpty(range(5,30)); p.els.max.addEventListener("change", () => updateComputedForPlayer(p));
       p.els.delta = makeReadonlyInput("0");
 
+      // Chance mode field
       p.els.chance = makeSelectWithEmpty(range(0,30)); p.els.chance.addEventListener("change", () => updateComputedForPlayer(p));
 
+      // Totaux
       p.els.lower_total = makeReadonlyInput("0");
       p.els.total = makeReadonlyInput("0");
 
@@ -547,6 +547,9 @@
       return p;
     }
 
+    // ---------------------------
+    // Events
+    // ---------------------------
     addPlayerBtn.addEventListener("click", () => {
       const name = prompt("Nom du joueur :");
       if (!name) return;
@@ -567,11 +570,7 @@
       updateRankingVisibility();
     });
 
-    window.addEventListener("resize", () => {
-      rebuildBoard();
-      updateAllPlayers();
-      updateRankingVisibility();
-    });
+    // Initial state: only "Ajouter joueur" visible (rules + board hidden)
   </script>
 
 </body>
